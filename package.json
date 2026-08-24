@@ -10,7 +10,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "lint": "eslint src tests",
-    "sanity": "bun run lint && bun run typecheck && bun test"
+    "sanity": "bun run lint && bun run typecheck && bun test",
+    "gendb": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "5",
