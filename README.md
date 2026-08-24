@@ -244,7 +244,7 @@ The `bookmarks` query uses a highly robust **cursor-based pagination** algorithm
 - **Composite Cursor**: The opaque Base64 cursor contains both the `createdAt` timestamp and `id`. 
 - **Database Pagination**: Pagination is pushed directly down to PostgreSQL via Prisma utilizing SQL `AND/OR` boundaries.
 - **Lookahead**: A `take + 1` query structure is employed to determine `hasNextPage` dynamically.
-- **Limits**: The `take` parameter is validated (minimum 1, maximum 100) and defaults to 50.
+- **Limits**: The `take` parameter is validated (minimum 1, maximum 100) and defaults to 20.
 
 **Example Flow:**
 1. Fetch the first page (take 2):
