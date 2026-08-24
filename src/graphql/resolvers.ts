@@ -9,6 +9,27 @@ const notImplemented = () => {
   throw new GraphQLError('Not implemented');
 };
 
+function encodeCursor(createdAt: Date, id: string): string {
+  const payload = { createdAt: createdAt.toISOString(), id };
+  return Buffer.from(JSON.stringify(payload)).toString('base64');
+}
+
+function decodeCursor(cursor: string): { createdAt: Date, id: string } {
+  try {
+    const payload = JSON.parse(Buffer.from(cursor, 'base64').toString('utf-8'));
+    if (!payload.createdAt || !payload.id) {
+      throw new Error();
+    }
+    const createdAt = new Date(payload.createdAt);
+    if (isNaN(createdAt.getTime())) {
+      throw new Error();
+    }
+    return { createdAt, id: payload.id };
+  } catch (e) {
+    throw new GraphQLError('Invalid cursor');
+  }
+}
+
 export const resolvers = {
   Query: {
     health: (_parent: unknown, _args: unknown, _context: GraphQLContext): string => {
@@ -28,15 +49,43 @@ export const resolvers = {
       });
     },
     bookmarks: async (_parent: unknown, args: { folderId?: string, search?: string, take?: number, cursor?: string }, context: GraphQLContext) => {
-      const where: Prisma.BookmarkWhereInput = {};
+      let take = args.take;
+      if (take === undefined || take === null) {
+        take = 20;
+      }
+      if (take <= 0 || take > 100) {
+        throw new GraphQLError('take must be between 1 and 100');
+      }
+
+      const existingFilters: Prisma.BookmarkWhereInput = {};
       
       if (args.folderId) {
-        where.folderId = args.folderId;
+        existingFilters.folderId = args.folderId;
       }
       if (args.search) {
-        where.title = {
+        existingFilters.title = {
           contains: args.search,
           mode: 'insensitive',
+        };
+      }
+
+      let where: Prisma.BookmarkWhereInput = { ...existingFilters };
+
+      if (args.cursor) {
+        const decoded = decodeCursor(args.cursor);
+        where = {
+          AND: [
+            existingFilters,
+            {
+              OR: [
+                { createdAt: { gt: decoded.createdAt } },
+                {
+                  createdAt: decoded.createdAt,
+                  id: { gt: decoded.id }
+                }
+              ]
+            }
+          ]
         };
       }
 
@@ -45,14 +94,26 @@ export const resolvers = {
         orderBy: [
           { createdAt: 'asc' },
           { id: 'asc' }
-        ]
+        ],
+        take: take + 1
       });
+
+      const hasNextPage = nodes.length > take;
+      if (hasNextPage) {
+        nodes.pop();
+      }
+
+      let endCursor: string | null = null;
+      if (nodes.length > 0) {
+        const lastNode = nodes[nodes.length - 1];
+        endCursor = encodeCursor(lastNode.createdAt, lastNode.id);
+      }
 
       return {
         nodes,
         pageInfo: {
-          hasNextPage: false,
-          endCursor: null
+          hasNextPage,
+          endCursor
         }
       };
     },
