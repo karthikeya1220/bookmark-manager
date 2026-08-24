@@ -1,0 +1,17 @@
+{
+  "name": "bookmark-manager",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --hot src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "graphql": "^16.8.0",
+    "graphql-yoga": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  }
+}
