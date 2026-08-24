@@ -46,8 +46,26 @@ interface FolderByIdData {
 }
 
 interface CreateFolderData {
-  createFolder: { id: string };
+  createFolder: { id: string; name: string };
 }
+
+interface CreateBookmarkData {
+  createBookmark: { id: string; title: string; url: string; tags: string[] };
+}
+
+interface UpdateBookmarkData {
+  updateBookmark: { title: string; url: string; tags: string[] };
+}
+
+interface DeleteBookmarkData {
+  deleteBookmark: boolean;
+}
+
+interface MoveBookmarkData {
+  moveBookmark: { id: string };
+}
+
+type GenericResponse = Record<string, unknown>;
 
 async function executeGraphQL<T>(query: string, variables?: Record<string, unknown>): Promise<GraphQLResponse<T>> {
   const response = await yoga.fetch("http://localhost/graphql", {
@@ -254,14 +272,157 @@ test("cursor at the final record returns zero nodes and hasNextPage=false", asyn
   expect(result.data.bookmarks.pageInfo.hasNextPage).toBe(false);
 });
 
-test("GraphQL accepts valid mutation operations", async () => {
-  const mutation = `
-    mutation TestMutations {
-      createFolder(name: "New Folder") { id }
-    }
-  `;
-  const result = await executeGraphQL<CreateFolderData>(mutation);
-  
+// CREATE FOLDER
+test("createFolder creates folder successfully and trims name", async () => {
+  const q = `mutation { createFolder(name: "  New Folder  ") { id name } }`;
+  const result = await executeGraphQL<CreateFolderData>(q);
+  expect(result.errors).toBeUndefined();
+  expect(result.data.createFolder.name).toBe("New Folder");
+});
+
+test("createFolder rejects empty or whitespace name", async () => {
+  const q = `mutation { createFolder(name: "   ") { id } }`;
+  const result = await executeGraphQL<GenericResponse>(q);
   expect(result.errors).toBeDefined();
-  expect(result.errors![0].message).toBe("Not implemented");
+  expect(result.errors![0].message).toBe("Folder name cannot be empty");
+});
+
+// CREATE BOOKMARK
+test("createBookmark creates valid bookmark and defaults tags", async () => {
+  const q = `mutation { createBookmark(title: "  Valid Title ", url: "https://example.com", folderId: "f1") { id title url tags } }`;
+  const result = await executeGraphQL<CreateBookmarkData>(q);
+  expect(result.errors).toBeUndefined();
+  expect(result.data.createBookmark.title).toBe("Valid Title");
+  expect(result.data.createBookmark.url).toBe("https://example.com/");
+  expect(result.data.createBookmark.tags).toEqual([]);
+});
+
+test("createBookmark stores supplied tags", async () => {
+  const q = `mutation { createBookmark(title: "A", url: "http://a", tags: ["t1", "t2"], folderId: "f1") { id title url tags } }`;
+  const result = await executeGraphQL<CreateBookmarkData>(q);
+  expect(result.errors).toBeUndefined();
+  expect(result.data.createBookmark.tags).toEqual(["t1", "t2"]);
+});
+
+test("createBookmark rejects empty title", async () => {
+  const q = `mutation { createBookmark(title: "   ", url: "http://a", folderId: "f1") { id } }`;
+  const result = await executeGraphQL<GenericResponse>(q);
+  expect(result.errors).toBeDefined();
+  expect(result.errors![0].message).toBe("Bookmark title cannot be empty");
+});
+
+test("createBookmark rejects malformed URL", async () => {
+  const q = `mutation { createBookmark(title: "A", url: "not-a-url", folderId: "f1") { id } }`;
+  const result = await executeGraphQL<GenericResponse>(q);
+  expect(result.errors).toBeDefined();
+  expect(result.errors![0].message).toBe("Invalid bookmark URL");
+});
+
+test("createBookmark rejects nonexistent folder", async () => {
+  const q = `mutation { createBookmark(title: "A", url: "http://a", folderId: "bad-id") { id } }`;
+  const result = await executeGraphQL<GenericResponse>(q);
+  expect(result.errors).toBeDefined();
+  expect(result.errors![0].message).toBe("Folder not found");
+});
+
+// UPDATE BOOKMARK
+test("updateBookmark updates fields selectively", async () => {
+  const createQ = `mutation { createBookmark(title: "Old", url: "http://old", tags: ["old"], folderId: "f1") { id title url tags } }`;
+  const createRes = await executeGraphQL<CreateBookmarkData>(createQ);
+  const id = createRes.data.createBookmark.id;
+
+  const updateTitleQ = `mutation { updateBookmark(id: "${id}", title: "  New Title ") { title url tags } }`;
+  let res = await executeGraphQL<UpdateBookmarkData>(updateTitleQ);
+  expect(res.errors).toBeUndefined();
+  expect(res.data.updateBookmark.title).toBe("New Title");
+  expect(res.data.updateBookmark.url).toBe("http://old/");
+  
+  const updateUrlQ = `mutation { updateBookmark(id: "${id}", url: "https://new") { title url tags } }`;
+  res = await executeGraphQL<UpdateBookmarkData>(updateUrlQ);
+  expect(res.data.updateBookmark.url).toBe("https://new/");
+  
+  const updateTagsQ = `mutation { updateBookmark(id: "${id}", tags: ["new"]) { title url tags } }`;
+  res = await executeGraphQL<UpdateBookmarkData>(updateTagsQ);
+  expect(res.data.updateBookmark.tags).toEqual(["new"]);
+});
+
+test("updateBookmark rejects update with no fields", async () => {
+  const q = `mutation { updateBookmark(id: "B") { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("No fields to update");
+});
+
+test("updateBookmark rejects explicit nulls", async () => {
+  const q = `mutation { updateBookmark(id: "B", title: null) { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Bookmark title cannot be empty");
+});
+
+test("updateBookmark rejects invalid title", async () => {
+  const q = `mutation { updateBookmark(id: "B", title: "   ") { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Bookmark title cannot be empty");
+});
+
+test("updateBookmark rejects nonexistent bookmark", async () => {
+  const q = `mutation { updateBookmark(id: "bad-id", title: "New") { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Bookmark not found");
+});
+
+// DELETE BOOKMARK
+test("deleteBookmark deletes existing bookmark and returns true", async () => {
+  const q = `mutation { deleteBookmark(id: "C") }`;
+  const res = await executeGraphQL<DeleteBookmarkData>(q);
+  expect(res.errors).toBeUndefined();
+  expect(res.data.deleteBookmark).toBe(true);
+
+  const q2 = `query { folder(id: "f1") { id name bookmarks { id } } }`;
+  const res2 = await executeGraphQL<FolderByIdData>(q2);
+  const ids = res2.data.folder!.bookmarks.map(b => b.id);
+  expect(ids.includes("C")).toBe(false);
+});
+
+test("deleteBookmark rejects nonexistent bookmark", async () => {
+  const q = `mutation { deleteBookmark(id: "bad-id") }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Bookmark not found");
+});
+
+// MOVE BOOKMARK
+test("moveBookmark moves bookmark to existing folder", async () => {
+  const q = `mutation { moveBookmark(id: "D", folderId: "f2") { id } }`;
+  const res = await executeGraphQL<MoveBookmarkData>(q);
+  expect(res.errors).toBeUndefined();
+
+  const q1 = `query { folder(id: "f1") { id name bookmarks { id } } }`;
+  const res1 = await executeGraphQL<FolderByIdData>(q1);
+  expect(res1.data.folder!.bookmarks.map(b => b.id).includes("D")).toBe(false);
+
+  const q2 = `query { folder(id: "f2") { id name bookmarks { id } } }`;
+  const res2 = await executeGraphQL<FolderByIdData>(q2);
+  expect(res2.data.folder!.bookmarks.map(b => b.id).includes("D")).toBe(true);
+});
+
+test("moveBookmark rejects nonexistent bookmark", async () => {
+  const q = `mutation { moveBookmark(id: "bad-id", folderId: "f2") { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Bookmark not found");
+});
+
+test("moveBookmark rejects nonexistent folder", async () => {
+  const q = `mutation { moveBookmark(id: "E", folderId: "bad-id") { id } }`;
+  const res = await executeGraphQL<GenericResponse>(q);
+  expect(res.errors).toBeDefined();
+  expect(res.errors![0].message).toBe("Folder not found");
+  
+  const q1 = `query { folder(id: "f1") { id name bookmarks { id } } }`;
+  const res1 = await executeGraphQL<FolderByIdData>(q1);
+  expect(res1.data.folder!.bookmarks.map(b => b.id).includes("E")).toBe(true);
 });
