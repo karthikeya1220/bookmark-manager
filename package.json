@@ -5,6 +5,7 @@
     "dev": "bun run --hot src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "test:setup": "bun run prisma/test-setup.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio"
