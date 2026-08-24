@@ -5,6 +5,6 @@ if (!testDbUrl) {
   throw new Error("TEST_DATABASE_URL is not set in .env");
 }
 
-console.log("Pushing Prisma schema to test database...");
-await $`DATABASE_URL=${testDbUrl} bunx prisma db push --accept-data-loss`;
+console.log("Applying Prisma migrations to test database...");
+await $`DATABASE_URL=${testDbUrl} bunx prisma migrate deploy`;
 console.log("Test database is ready.");
