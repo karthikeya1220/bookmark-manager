@@ -8,7 +8,9 @@
     "test:setup": "bun run prisma/test-setup.ts",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "lint": "eslint src tests",
+    "sanity": "bun run lint && bun run typecheck && bun test"
   },
   "dependencies": {
     "@prisma/client": "5",
@@ -16,8 +18,11 @@
     "graphql-yoga": "^5.0.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/bun": "latest",
+    "eslint": "^10.9.0",
     "prisma": "5",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.67.0"
   }
 }

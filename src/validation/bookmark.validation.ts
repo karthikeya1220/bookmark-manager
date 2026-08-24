@@ -25,7 +25,7 @@ export function validateUrl(urlString: string): string {
       throw new GraphQLError('Invalid bookmark URL');
     }
     return url.href;
-  } catch (e) {
+  } catch {
     throw new GraphQLError('Invalid bookmark URL');
   }
 }

@@ -6,10 +6,6 @@ import { validateTitle, validateUrl } from '../validation/bookmark.validation.ts
 type ParentFolder = Folder & { bookmarks?: Bookmark[] };
 type ParentBookmark = Bookmark & { folder?: Folder };
 
-const notImplemented = () => {
-  throw new GraphQLError('Not implemented');
-};
-
 function encodeCursor(createdAt: Date, id: string): string {
   const payload = { createdAt: createdAt.toISOString(), id };
   return Buffer.from(JSON.stringify(payload)).toString('base64');
@@ -26,7 +22,7 @@ function decodeCursor(cursor: string): { createdAt: Date, id: string } {
       throw new Error();
     }
     return { createdAt, id: payload.id };
-  } catch (e) {
+  } catch {
     throw new GraphQLError('Invalid cursor');
   }
 }
@@ -139,8 +135,11 @@ export const resolvers = {
   },
   Mutation: {
     createFolder: async (_parent: unknown, args: { name: string }, context: GraphQLContext) => {
-      let trimmed = '';
-      if (args.name === null || args.name === undefined || (trimmed = args.name.trim()) === '') {
+      if (args.name === null || args.name === undefined) {
+        throw new GraphQLError('Folder name cannot be empty');
+      }
+      const trimmed = args.name.trim();
+      if (trimmed === '') {
         throw new GraphQLError('Folder name cannot be empty');
       }
       return context.prisma.folder.create({
