@@ -42,6 +42,18 @@ docker compose version
 
 ## Setup
 
+Quick start (all commands from the repository root):
+```bash
+docker compose up -d      # start PostgreSQL
+bun install               # install dependencies
+cp .env.example .env      # environment variables
+bun run gendb             # generate the Prisma client
+bun run db:migrate        # apply migrations to the dev database
+bun run dev               # GraphQL server at http://localhost:3000/graphql
+```
+
+Detailed steps:
+
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
@@ -104,11 +116,11 @@ The project uses a real **PostgreSQL** database running inside Docker.
 - **Development Database**: Used during `bun run dev` and `bun run db:migrate`.
 - **Test Database**: A dedicated, isolated database used purely for tests. 
 
-Before running integration tests, the test database is set up using:
+Before running integration tests, prepare the test database with:
 ```bash
 bun run test:setup
 ```
-This script explicitly utilizes `prisma migrate deploy` to safely deploy committed migrations to the test database, ensuring development and test environments match perfectly.
+This script creates the test database (`bookmark_manager_test`) if it does not exist yet, then explicitly utilizes `prisma migrate deploy` to safely deploy committed migrations to it, ensuring development and test environments match perfectly. It uses a local `psql` client when available and otherwise falls back to `docker compose exec`.
 
 ## Running
 
@@ -124,6 +136,21 @@ Other helpful commands:
 - **Check TypeScript types**: `bun run typecheck`
 - **Run the test suite**: `bun test`
 - **Run all checks**: `bun run sanity`
+
+### Running with Docker
+
+A `Dockerfile` is included for running the GraphQL service itself (the database still comes from `docker compose up -d`):
+
+```bash
+docker build -t bookmark-manager-api .
+docker run --rm -p 3000:3000 --env-file .env bookmark-manager-api
+```
+
+The container connects to the database using `DATABASE_URL`; when running against the Docker Compose Postgres from macOS/Windows, replace `localhost` with `host.docker.internal` in that variable.
+
+### CI
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) runs lint, typecheck, and the full test suite (including PostgreSQL integration tests via a service container) on every pull request and push to `main`.
 
 ## API
 
