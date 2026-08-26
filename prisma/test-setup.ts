@@ -31,7 +31,7 @@ async function createTestDatabase(): Promise<void> {
   const adminUrl = new URL(dbUrl);
   adminUrl.pathname = "/postgres";
   if (Bun.which("psql")) {
-    await $`createdb ${adminUrl.href} ${dbName}`;
+    await $`psql ${adminUrl.href} -c "CREATE DATABASE ${dbName}"`;
     return;
   }
   const composeUser = parsed.username || "postgres";
