@@ -15,6 +15,7 @@ if (!dbName) {
 async function psqlExists(args: string[]): Promise<boolean> {
   const adminUrl = new URL(dbUrl);
   adminUrl.pathname = "/postgres";
+  adminUrl.search = "";
   const result = await $`${args} ${adminUrl.href} -tAc "SELECT 1 FROM pg_database WHERE datname = ${dbName}"`.quiet().nothrow();
   return result.exitCode === 0 && result.stdout.toString().trim() === "1";
 }
@@ -30,6 +31,7 @@ async function dbExists(): Promise<boolean> {
 async function createTestDatabase(): Promise<void> {
   const adminUrl = new URL(dbUrl);
   adminUrl.pathname = "/postgres";
+  adminUrl.search = "";
   if (Bun.which("psql")) {
     await $`psql ${adminUrl.href} -c "CREATE DATABASE ${dbName}"`;
     return;
